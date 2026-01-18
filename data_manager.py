@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import gmplot
+import matplotlib.pyplot as plt
 
 zoom_level = 9
 
@@ -36,13 +37,32 @@ def convertSI(df):
     df = df.drop('GROUND VELOCITY', axis=1)
     return df
 
+def generateMap(latitude_list, longitude_list):
+    global zoom_level
+    gmap = gmplot.GoogleMapPlotter(latitude_list[0], longitude_list[0], zoom_level)
+    gmap.scatter(latitude_list, longitude_list, 'blue', size=50, marker=False)
+    gmap.plot(latitude_list, longitude_list, 'blue', edge_width=2.5)
+    gmap.draw("map.html")
+
+def plotVelocities(TAS, IAS, time):
+    plt.plot(time, TAS, label="True Airspeed")
+    plt.plot(time, IAS, label="Indicated Airspeed")
+    
+    plt.xlabel("Time")
+    plt.ylabel("Airspeed in kts")
+    plt.title("Airspeeds at time")
+    plt.legend()
+    plt.show()
+
 df_raw = pd.read_csv(file_path, parse_dates=['timestamp'])
 df = convertSI(df_raw)
 
 latitude_list = list(df['PLANE LATITUDE'])
 longitude_list = list(df['PLANE LONGITUDE'])
 
-gmap = gmplot.GoogleMapPlotter(latitude_list[0], longitude_list[0], zoom_level)
-gmap.scatter(latitude_list, longitude_list, 'blue', size=50, marker=False)
-gmap.plot(latitude_list, longitude_list, 'blue', edge_width=2.5)
-gmap.draw("map.html")
+TAS = list(df['AIRSPEED TRUE'])
+IAS = list(df['AIRSPEED INDICATED'])
+time = list(df['ABSOLUTE TIME'])
+
+plotVelocities(TAS, IAS, time)
+#generateMap(latitude_list, longitude_list)
