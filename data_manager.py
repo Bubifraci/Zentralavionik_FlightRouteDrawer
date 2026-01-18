@@ -37,11 +37,20 @@ def convertSI(df):
     df = df.drop('GROUND VELOCITY', axis=1)
     return df
 
-def generateMapVelocity(latitude_list, longitude_list):
+def generateMap(latitude_list, longitude_list):
     global zoom_level
     gmap = gmplot.GoogleMapPlotter(latitude_list[0], longitude_list[0], zoom_level)
     gmap.scatter(latitude_list, longitude_list, 'blue', size=50, marker=False)
     gmap.plot(latitude_list, longitude_list, 'blue', edge_width=2.5)
+
+    latTEA, lonTEA = 41.296667, 13.970556
+    latVIE, lonVIE = 41.913333, 16.051111
+    latLAT, lonLAT = 41.541111, 12.918056
+
+    gmap.marker(latTEA, lonTEA, color="red", title="TEA VOR")
+    gmap.marker(latVIE, lonVIE, color="red", title="VIE VOR")
+    gmap.marker(latLAT, lonLAT, color="red", title="LAT VOR")
+
     gmap.draw("map.html")
 
 def plotAltitude(alt, time):
@@ -75,6 +84,6 @@ time = list(df['ABSOLUTE TIME'])
 
 alt = list(df['PLANE ALTITUDE'])
 
-plotAltitude(alt, time)
+#plotAltitude(alt, time)
 #plotVelocities(TAS, IAS, time)
-#generateMap(latitude_list, longitude_list)
+generateMap(latitude_list, longitude_list)
