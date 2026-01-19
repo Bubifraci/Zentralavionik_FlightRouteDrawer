@@ -265,3 +265,15 @@ plt.title("Flat Earth vs NED Trajectory")
 plt.legend()
 plt.show()
 '''
+
+
+#Plot Vertical Speed vs Velocity World Y
+'''
+plt.plot(time, df['VELOCITY WORLD Y'], label="World Velocity Y")
+plt.plot(time, df['VERTICAL SPEED'], label="Vertical Speed")
+plt.xlabel("Absolute time")
+plt.ylabel("Velocity in m/s")
+plt.title("Velocity World Y vs Vertical Speed")
+plt.legend()
+plt.show()
+'''
