@@ -2,6 +2,7 @@ import pandas as pd
 from pathlib import Path
 import gmplot
 import matplotlib.pyplot as plt
+import numpy as np
 
 zoom_level = 9
 
@@ -37,10 +38,14 @@ def convertSI(df):
     df = df.drop('GROUND VELOCITY', axis=1)
     return df
 
-def generateMap(latitude_list, longitude_list):
+def generateMap(latitude_list, longitude_list, latitude_list2 = None, longitude_list2 = None):
     global zoom_level
     gmap = gmplot.GoogleMapPlotter(latitude_list[0], longitude_list[0], zoom_level)
     gmap.scatter(latitude_list, longitude_list, 'blue', size=50, marker=False)
+
+    if((latitude_list2 is not None) and (longitude_list2 is not None)):
+        gmap.scatter(latitude_list2, longitude_list2, 'yellow', size=50, marker=False)
+        gmap.plot(latitude_list2, longitude_list2, 'yellow', edge_width=2.5)
     gmap.plot(latitude_list, longitude_list, 'blue', edge_width=2.5)
 
     latTEA, lonTEA = 41.296667, 13.970556
@@ -67,10 +72,86 @@ def plotVelocities(TAS, IAS, time):
     plt.plot(time, IAS, label="Indicated Airspeed")
     
     plt.xlabel("Time")
-    plt.ylabel("Airspeed in kts")
+    plt.ylabel("Airspeed in m/s")
     plt.title("Airspeeds at time")
     plt.legend()
     plt.show()
+
+def manualIntegrate(aX, aY, aZ, times, startConditions = None):
+    vX = [0.0]
+    vY = [0.0]
+    vZ = [0.0]
+
+    if(startConditions is not None):
+        vX = [startConditions[0]]
+        vY = [startConditions[1]]
+        vZ = [startConditions[2]]
+
+    for i in range(1, len(aX)):
+        dT = times[i]-times[i-1]
+        vX.append(aX[i]*dT+vX[i-1])
+        vY.append(aY[i]*dT+vY[i-1])
+        vZ.append(aZ[i]*dT+vZ[i-1])
+    return [vX, vY, vZ]
+
+def BFF_to_NED(r: float, p: float, y: float) -> np.ndarray:
+    cr, sr = np.cos(r), np.sin(r)
+    cth,  sth  = np.cos(p), np.sin(p)
+    cy, sy = np.cos(y), np.sin(y)
+
+    return np.array([
+        [ cth*cy,                cth*sy,               -sth     ],
+        [ sr*sth*cy - cr*sy, sr*sth*sy + cr*cy, sr*cth ],
+        [ cr*sth*cy + sr*sy, cr*sth*sy - sr*cy, cr*cth ],
+    ]).T
+
+def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt):
+    aX = list(df['ACCELERATION BODY Z'])
+    aY = list(df['ACCELERATION BODY X'])
+    aZ = list(df['ACCELERATION BODY Y'])
+
+    roll = list(df["PLANE BANK DEGREES"].to_numpy())
+    pitch = list(df["PLANE PITCH DEGREES"].to_numpy())
+    yaw = list(df["PLANE HEADING DEGREES TRUE"].to_numpy())
+
+    aX_NED = []
+    aY_NED = []
+    aZ_NED = []
+    for i in range(len(aX)):
+        R = BFF_to_NED(roll[i], pitch[i], yaw[i])
+        a = np.array([
+            aX[i],
+            aY[i],
+            aZ[i],
+        ])
+
+        a_world = R @ a
+        #a_world[2] += 9.80665
+        aX_NED.append(a_world[0])
+        aY_NED.append(a_world[1])
+        aZ_NED.append(a_world[2])
+    v0 = [
+        float(df['VELOCITY WORLD Z'].iloc[0]),   #North
+        float(df['VELOCITY WORLD X'].iloc[0]),   #East
+        float(-df['VELOCITY WORLD Y'].iloc[0]),  #Down
+    ]
+    velocities = manualIntegrate(aX_NED, aY_NED, aZ_NED, time, startConditions=v0)
+    positions = manualIntegrate(velocities[0], velocities[1], velocities[2], time)
+    north = positions[0]
+    east = positions[1]
+    down = positions[2]
+
+    latitudes = [initialLat]
+    longitudes = [initialLon]
+    altitudes = [initialAlt]
+
+    for i in range(len(north)):
+        altitudes.append(down[i] + altitudes[i])
+        latitudes.append(initialLat + north[i] * 0.000009044)
+        longitudes.append(initialLon + east[i] * 0.00000898)
+
+    return[longitudes, latitudes, altitudes]
+
 
 df_raw = pd.read_csv(file_path, parse_dates=['timestamp'])
 df = convertSI(df_raw)
@@ -86,4 +167,7 @@ alt = list(df['PLANE ALTITUDE'])
 
 #plotAltitude(alt, time)
 #plotVelocities(TAS, IAS, time)
-generateMap(latitude_list, longitude_list)
+#generateMap(latitude_list, longitude_list)
+
+trajectory_NED = trajectoryBFF_NED(df, time, latitude_list[0], longitude_list[0], alt[0])
+generateMap(latitude_list, longitude_list, longitude_list2=trajectory_NED[0], latitude_list2=trajectory_NED[1])
