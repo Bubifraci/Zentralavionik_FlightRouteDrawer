@@ -77,22 +77,22 @@ def plotVelocities(TAS, IAS, time):
     plt.legend()
     plt.show()
 
-def manualIntegrate(aX, aY, aZ, times, startConditions = None):
-    vX = [0.0]
-    vY = [0.0]
-    vZ = [0.0]
+def manualIntegrate(x, y, z, times, startConditions = None):
+    XX = [0.0]
+    YY = [0.0]
+    ZZ = [0.0]
 
     if(startConditions is not None):
-        vX = [startConditions[0]]
-        vY = [startConditions[1]]
-        vZ = [startConditions[2]]
+        XX = [startConditions[0]]
+        YY = [startConditions[1]]
+        ZZ = [startConditions[2]]
 
-    for i in range(1, len(aX)):
+    for i in range(1, len(x)):
         dT = times[i]-times[i-1]
-        vX.append(aX[i]*dT+vX[i-1])
-        vY.append(aY[i]*dT+vY[i-1])
-        vZ.append(aZ[i]*dT+vZ[i-1])
-    return [vX, vY, vZ]
+        XX.append(x[i]*dT+XX[i-1])
+        YY.append(y[i]*dT+YY[i-1])
+        ZZ.append(z[i]*dT+ZZ[i-1])
+    return [XX, YY, ZZ]
 
 def BFF_to_NED(r: float, p: float, y: float) -> np.ndarray:
     cr, sr = np.cos(r), np.sin(r)
@@ -149,6 +149,14 @@ def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt):
         altitudes.append(down[i] + altitudes[i])
         latitudes.append(initialLat + north[i] * 0.000009044)
         longitudes.append(initialLon + east[i] * 0.00000898)
+
+    plt.plot(velocities[0], velocities[1], label="Coordinates")
+
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.title("X/Y")
+    plt.legend()
+    plt.show()
 
     return[longitudes, latitudes, altitudes]
 
