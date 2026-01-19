@@ -9,6 +9,7 @@ zoom_level = 9
 BASE_DIR = Path(__file__).resolve().parent
 file_path = BASE_DIR / "flight_data.csv"
 
+#Convert to SI Units
 def convertSI(df):
     #ft/s to m/s
     df['VELOCITY BODY X'] = df['VELOCITY BODY X'] * 0.3048
@@ -38,6 +39,7 @@ def convertSI(df):
     df = df.drop('GROUND VELOCITY', axis=1)
     return df
 
+#Generate Map function
 def generateMap(latitude_list, longitude_list, latitude_list2 = None, longitude_list2 = None):
     global zoom_level
     gmap = gmplot.GoogleMapPlotter(latitude_list[0], longitude_list[0], zoom_level)
@@ -58,6 +60,7 @@ def generateMap(latitude_list, longitude_list, latitude_list2 = None, longitude_
 
     gmap.draw("map.html")
 
+#Plotter functions
 def plotAltitude(alt, time):
     plt.plot(time, alt, label="Altitude")
 
@@ -77,6 +80,7 @@ def plotVelocities(TAS, IAS, time):
     plt.legend()
     plt.show()
 
+#Helper Integration method
 def manualIntegrate(x, y, z, times, startConditions = None):
     XX = [0.0]
     YY = [0.0]
@@ -97,6 +101,7 @@ def manualIntegrate(x, y, z, times, startConditions = None):
         return [XX, YY, ZZ]
     return[XX, YY]
 
+#Calculate intertial NED trajectory and draw map + helper functions
 def BFF_to_NED(r: float, p: float, y: float) -> np.ndarray:
     cr, sr = np.cos(r), np.sin(r)
     cth,  sth  = np.cos(p), np.sin(p)
@@ -191,6 +196,7 @@ def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt, returnNED = 
 
     return[longitudes, latitudes, altitudes]
 
+#Calculate flat earth trajectory and helper functions
 def getMeridian(phi, a, e2):
     return (a*(1-e2))/(1-e2*np.sin(phi)**2)**1.5
 
@@ -220,9 +226,8 @@ def flat_earth_trajectory(lat, lon, time, multiplier=1):
     #Since psi is zero, the North/East coordinates are also the flat earth coordinates
     return [vN, vE]
     
-
-
 df_raw = pd.read_csv(file_path, parse_dates=['timestamp'])
+#Convert to SI Units
 df = convertSI(df_raw)
 
 latitude_list = list(df['PLANE LATITUDE'])
@@ -234,13 +239,21 @@ time = list(df['ABSOLUTE TIME'])
 
 alt = list(df['PLANE ALTITUDE'])
 
-#plotAltitude(alt, time)
-#plotVelocities(TAS, IAS, time)
-#generateMap(latitude_list, longitude_list)
+#Plot Altitude, plot velocities, generate map (HTML file in same directory) with trajectory and VOR
+'''
+plotAltitude(alt, time)
+plotVelocities(TAS, IAS, time)
+generateMap(latitude_list, longitude_list)
+'''
 
-#trajectory_NED = trajectoryBFF_NED(df, time, latitude_list[0], longitude_list[0], alt[0])
-#generateMap(latitude_list, longitude_list, longitude_list2=trajectory_NED[0], latitude_list2=trajectory_NED[1])
+#Calculate inertial trajectory and generate map based on it, including the original trajectory (blue) and inertial (yellow)
+'''
+trajectory_NED = trajectoryBFF_NED(df, time, latitude_list[0], longitude_list[0], alt[0])
+generateMap(latitude_list, longitude_list, longitude_list2=trajectory_NED[0], latitude_list2=trajectory_NED[1])
+'''
 
+#Inertial Flight Trajectory vs Flat Earth Trajectory
+'''
 trajectory_flat = flat_earth_trajectory(latitude_list, longitude_list, time)
 trajectory_NED = trajectoryBFF_NED(df, time, latitude_list[0], longitude_list[0], alt[0], returnNED=True)
 
@@ -251,7 +264,4 @@ plt.ylabel("North in m")
 plt.title("Flat Earth vs NED Trajectory")
 plt.legend()
 plt.show()
-
-
-
-
+'''
