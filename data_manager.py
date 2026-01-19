@@ -105,27 +105,53 @@ def BFF_to_NED(r: float, p: float, y: float) -> np.ndarray:
         [ cr*sth*cy + sr*sy, cr*sth*sy - sr*cy, cr*cth ],
     ]).T
 
+def getAngularRates(roll, pitch, yaw, time):
+    angular_rates = [np.array([0, 0, 0])]
+    yaw = np.unwrap(yaw)
+    for i in range(1, len(roll)):
+        r = roll[i]
+        p = pitch[i]
+        y = yaw[i]
+        rotationMatrix = np.array([[1, 0, -np.sin(p)], [0, np.cos(r), np.cos(p)*np.sin(r)], [0, -np.sin(r), np.cos(p)*np.cos(r)]])
+
+        dT = time[i]-time[i-1]
+        dR = (r-roll[i-1])/dT
+        dP = (p-pitch[i-1])/dT
+        dY = (y-yaw[i-1])/dT
+
+        angular_rate = np.array([dR, dP, dY])
+        angular_rates.append(rotationMatrix @ angular_rate)
+    return angular_rates
+
 def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt):
     aX = list(df['ACCELERATION BODY Z'])
     aY = list(df['ACCELERATION BODY X'])
     aZ = list(df['ACCELERATION BODY Y'])
 
-    roll = list(df["PLANE BANK DEGREES"].to_numpy())
-    pitch = list(df["PLANE PITCH DEGREES"].to_numpy())
-    yaw = list(df["PLANE HEADING DEGREES TRUE"].to_numpy())
+    velocityBodyForward = df["VELOCITY BODY Z"].to_numpy() 
+    velocityBodyRight = df["VELOCITY BODY X"].to_numpy() 
+    velocityBodyDown = df["VELOCITY BODY Y"].to_numpy() 
+
+    roll = df["PLANE BANK DEGREES"].to_numpy()
+    pitch = df["PLANE PITCH DEGREES"].to_numpy()
+    yaw = df["PLANE HEADING DEGREES TRUE"].to_numpy()
+
+    angular_rates = getAngularRates(roll, pitch, yaw, time)
 
     aX_NED = []
     aY_NED = []
     aZ_NED = []
     for i in range(len(aX)):
         R = BFF_to_NED(roll[i], pitch[i], yaw[i])
-        a = np.array([
+        aBody = np.array([
             aX[i],
             aY[i],
             aZ[i],
         ])
 
-        a_world = R @ a
+        aInertial = aBody + np.cross(angular_rates[i], np.array([velocityBodyForward[i], velocityBodyRight[i], velocityBodyDown[i]]))
+
+        a_world = R @ aInertial
         #a_world[2] += 9.80665
         aX_NED.append(a_world[0])
         aY_NED.append(a_world[1])
@@ -144,19 +170,19 @@ def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt):
     latitudes = [initialLat]
     longitudes = [initialLon]
     altitudes = [initialAlt]
-
-    for i in range(len(north)):
-        altitudes.append(down[i] + altitudes[i])
+    
+    for i in range(1, len(north)):
+        altitudes.append(altitudes[0] - down[i])
         latitudes.append(initialLat + north[i] * 0.000009044)
         longitudes.append(initialLon + east[i] * 0.00000898)
 
-    plt.plot(velocities[0], velocities[1], label="Coordinates")
+    plt.plot(time, altitudes, label="Altitude")
 
-    plt.xlabel("X")
-    plt.ylabel("Y")
-    plt.title("X/Y")
-    plt.legend()
-    plt.show()
+    #plt.xlabel("Absolute time")
+    #plt.ylabel("Altitude in meters")
+    #plt.title("Altitude at time")
+    #plt.legend()
+    #plt.show()
 
     return[longitudes, latitudes, altitudes]
 
