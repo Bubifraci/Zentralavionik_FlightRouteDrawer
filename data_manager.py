@@ -91,8 +91,11 @@ def manualIntegrate(x, y, z, times, startConditions = None):
         dT = times[i]-times[i-1]
         XX.append(x[i]*dT+XX[i-1])
         YY.append(y[i]*dT+YY[i-1])
-        ZZ.append(z[i]*dT+ZZ[i-1])
-    return [XX, YY, ZZ]
+        if(z is not None):
+            ZZ.append(z[i]*dT+ZZ[i-1])
+    if(z is not None):
+        return [XX, YY, ZZ]
+    return[XX, YY]
 
 def BFF_to_NED(r: float, p: float, y: float) -> np.ndarray:
     cr, sr = np.cos(r), np.sin(r)
@@ -123,7 +126,7 @@ def getAngularRates(roll, pitch, yaw, time):
         angular_rates.append(rotationMatrix @ angular_rate)
     return angular_rates
 
-def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt):
+def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt, returnNED = False):
     aX = list(df['ACCELERATION BODY Z'])
     aY = list(df['ACCELERATION BODY X'])
     aZ = list(df['ACCELERATION BODY Y'])
@@ -163,6 +166,8 @@ def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt):
     ]
     velocities = manualIntegrate(aX_NED, aY_NED, aZ_NED, time, startConditions=v0)
     positions = manualIntegrate(velocities[0], velocities[1], velocities[2], time)
+    if(returnNED is True):
+        return positions
     north = positions[0]
     east = positions[1]
     down = positions[2]
@@ -186,6 +191,36 @@ def trajectoryBFF_NED(df, time, initialLat, initialLon, initialAlt):
 
     return[longitudes, latitudes, altitudes]
 
+def getMeridian(phi, a, e2):
+    return (a*(1-e2))/(1-e2*np.sin(phi)**2)**1.5
+
+def getPrimeVertical(phi, a, e2):
+    return a/(np.sqrt(1-e2*np.sin(phi)**2))
+
+def flat_earth_trajectory(lat, lon, time, multiplier=1):
+    lat = np.deg2rad(lat)
+    lon = np.deg2rad(lon)
+
+    a = 6378137
+    b = 6356752.3142
+    f = (a-b)/a
+    e2 = f*(2-f)
+
+    initialLat = lat[0]
+    initialLon = lon[0]
+
+    vN = []
+    vE = []
+    for i in range(len(lon)):
+        phi = lat[i]
+        delta = lon[i]
+        vN.append(multiplier * getMeridian(phi, a, e2)*(phi-initialLat))
+        vE.append(multiplier * getPrimeVertical(phi, a, e2)*np.cos(initialLat)*(delta - initialLon))
+    #positions = manualIntegrate(vN, vE, None, time)
+    #Since psi is zero, the North/East coordinates are also the flat earth coordinates
+    return [vN, vE]
+    
+
 
 df_raw = pd.read_csv(file_path, parse_dates=['timestamp'])
 df = convertSI(df_raw)
@@ -203,5 +238,20 @@ alt = list(df['PLANE ALTITUDE'])
 #plotVelocities(TAS, IAS, time)
 #generateMap(latitude_list, longitude_list)
 
-trajectory_NED = trajectoryBFF_NED(df, time, latitude_list[0], longitude_list[0], alt[0])
-generateMap(latitude_list, longitude_list, longitude_list2=trajectory_NED[0], latitude_list2=trajectory_NED[1])
+#trajectory_NED = trajectoryBFF_NED(df, time, latitude_list[0], longitude_list[0], alt[0])
+#generateMap(latitude_list, longitude_list, longitude_list2=trajectory_NED[0], latitude_list2=trajectory_NED[1])
+
+trajectory_flat = flat_earth_trajectory(latitude_list, longitude_list, time)
+trajectory_NED = trajectoryBFF_NED(df, time, latitude_list[0], longitude_list[0], alt[0], returnNED=True)
+
+plt.plot(trajectory_flat[0], trajectory_flat[1], label="Flat Earth Trajectory")
+plt.plot(trajectory_NED[0], trajectory_NED[1], label="NED Trajectory")
+plt.xlabel("East in m")
+plt.ylabel("North in m")
+plt.title("Flat Earth vs NED Trajectory")
+plt.legend()
+plt.show()
+
+
+
+
